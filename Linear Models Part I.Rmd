@@ -1,0 +1,672 @@
+---
+title: "Linear Models Part I"
+author: "Samuel Castillo"
+date: "August 18, 2018"
+output: html_document
+---
+
+```{r}
+#libraries
+#install.packages(list("readxl", "MASS", "car", "boot", "actuar", "EnvStats", "gridExtra", "dobson", "knitr", "nnet", "questionr"))
+library(caret)
+library(readxl)
+library(MASS)
+library(car)
+library(boot)
+library(actuar)
+library(dobson) #data sets from text
+library(gridExtra)
+library(knitr)
+library(nnet)
+library(questionr)
+library(purrr)
+library(tidyverse)
+
+
+#paremeters
+n = 1000
+
+#data
+distributions <- data_frame(
+  exponential = rexp(n, rate = 1),
+  gamma = rgamma(n, shape = 5),
+  weibull = rweibull(n, shape = 1),
+  pareto = rpareto(n, shape = 20, scale = 2),
+  lognormal = exp(rnorm(n)),
+  beta = rbeta(n, shape1 = 1, shape2 = 2)
+  )
+
+#functions
+dist_plot <- function(dist_name){
+  
+  p1 <-   distributions %>% 
+          ggplot(aes(get(dist_name), fill = "area")) + 
+          geom_density() + 
+          ggtitle(paste0("Empirical PDF: ", dist_name)) + 
+          guides(fill=FALSE) + 
+          xlab("range of X")
+  
+  p2 <-   distributions %>% 
+          ggplot(aes(get(dist_name))) + 
+          stat_ecdf() + 
+          ggtitle(paste0("Empirical CDF: ", dist_name))
+  
+  grid.arrange(p1, p2, nrow = 1)
+}
+
+feature_plot <- function(x_input, y_input){
+  transparentTheme(trans = .9)
+  caret::featurePlot(x = x_input,
+                     y = y_input,
+            plot = "pairs",
+            scales = list(x = list(relation="free"), 
+                          y = list(relation="free")), 
+            adjust = 1.5, 
+            pch = "+",
+            auto.key = list(columns = 2))
+}
+
+
+
+```
+
+#Background
+
+#Commonly-used Response Distributions
+
+1. Exponential Disribution
+* Memoryless
+* Poisson interarrival times
+* Moment Generating Function = lamda/(lamda - t)
+
+```{r}
+dist_plot("exponential")
+```
+
+2.  Gamma Distribution
+
+* Sum of Exponentials 
+* Poisson arrival times, totals for exponential claims
+* MGF = (1/(1 - theta*t)^alpha) for t < 1/theta
+
+```{r}
+dist_plot("gamma")
+```
+
+
+3.  Weibull Distribution
+* Power Transformation of Expontential: X^(1/tao)
+* MGF is too complicated
+
+```{r}
+dist_plot("weibull")
+```
+
+4. Pareto Distribution
+* Only finite moments up to alpha, and no MGF beyond
+* Thick-tailed in the probability of extreme values drops slowly
+* Hazard function is alpha(x + theta)
+* Mixture of Exponential Distributions
+
+```{r}
+dist_plot("pareto")
+```
+
+5.  Lognormal Distribution
+* Exponential Transformation of Normal: e^z
+* Right-Skewed
+
+```{r}
+dist_plot("lognormal")
+```
+
+
+6.  Beta Distribution
+* Transformation of X1 = Gamma(alpha, 1), X2 = Gamma (beta, 1): X1/(X1 + X2)
+
+```{r}
+dist_plot("beta")
+```
+
+#Example 1: Continuous Response with ANOVA
+
+#Data
+
+The data is the percentages of total calories obtained from complex carbohydrates, for twenty male insulin-dependent diabetics who had been on a high-carbohydrate diet for six months.  The question we are trying to answer is whether or not age plays a role in the percent of total calories obtained from complex carbs.
+
+
+```{r}
+data("carbohydrate")
+head(carbohydrate)
+```
+
+We can test models with and without `age` included to see if it plays a significant role.
+
+```{r}
+m0 = glm(carbohydrate ~ age + weight + protein, 
+         family = gaussian, data = carbohydrate)
+m0
+```
+
+We notice that the significance level for `age` is suspiciously high at 0.31389.  We would expect to see the residual deviance to be less than the degrees of freedom, but 567.66 is much greater than 16.  
+
+```{r}
+summary(m0)
+```
+
+Another way of seeing this is by looking at the decrease in deviance by adding `age` to the model.  As seen in the ANOVA table below, this decrease is small, which again suggests that it does not need to be included.
+
+```{r}
+anova(m0)
+```
+
+We fit a new model without age.
+
+```{r}
+m1 = glm(carbohydrate ~ weight + protein, 
+         family = gaussian, data = carbohydrate)
+summary(m1)
+```
+
+
+```{r}
+anova(m1)
+```
+
+The AIC for the model without `age` is also lower.
+
+```{r}
+summary <- data_frame(
+  Model = c("carbohydrates ~ age + weight + protein", "carbohydrates ~ weight + protein"),
+  AIC = c(AIC(m0), AIC(m1))
+    )
+
+kable(summary)
+```
+
+We can compute the AIC manually using the AIC formula -2*log_likelihood + 2*p where p is the number of parameters being estimated.  In this case, that is 4 + 1 including the estimate for sigma^2.
+
+```{r}
+logLik(m1)
+```
+
+```{r}
+-2*logLik(m1) + 2*4
+```
+
+Finally, we can use an ANOVA test to compare the model with `age` included to the model without it.
+
+H0: `age` should be included 
+H1: `age` should not be included
+
+Reject Region: p < 0.05
+
+```{r}
+anova(m0, m1, test = "Chisq")
+```
+
+We see that the p-value 0.2984 > 0.05 indicates that we are unable to reject the null hypothesis and say that `age` should be included.
+
+```{r}
+glm.diag.plots(m1)
+```
+
+We can check for multi-colinearity by looking at the variance inflation factors (VIF).  Because all of these values are close to 1, `age`, `weight`, and `protein` are not significantly correlated.
+
+```{r}
+vif(m0)
+```
+
+
+#Example 2: Continuous Response with ANCOVA
+
+ANCOVA is the same as ANOVA with the addition of categerorical variables.  For simplicity, let's create a new category and add it to the data.  Imagine that there is a variable `exercise`, indicating whether or not the male patient tested participated in at least 60 minutes of exercise during each week.  This could be related to `carbohydrate` in that patients who exercised ate more carbs in order to stay energized.
+
+```{r}
+carbohydrate_w_exercise <- carbohydrate %>% 
+  mutate(exercise = ifelse(carbohydrate > 40, yes = "Active", no = "Inactive" ))
+
+m2 <- glm(carbohydrate ~ weight + protein + exercise, 
+         family = gaussian, 
+         data = carbohydrate_w_exercise)
+
+summary(m2)
+```
+
+
+The p-value on the new `exercise` field of 0.000109 indicates that this should be included in the model.  In other words, we can say that `exercise` plays a role in determining the response variable.  And this should be the case, given that we designed it this way
+!
+
+```{r}
+anova(m2, test = "F")
+```
+
+# Example 3: Binary Response on Grouped Data
+
+Instead of having individual records, we have groups of records with sample sizes equal to the value of `n` below.
+
+```{r}
+#data.  This will need to be moved to google sheets or some other online data storage location
+beetles_raw <- read_csv("//FILE-NA1-02/USERDATA2$/sam82554/Desktop/MAS-I/R/TIA Data/beetle_mortality.csv") 
+
+head(beetles_raw)
+```
+
+Because we have different sample sizes at each dosage level, we need to predict the number that die **and** survive at each dosage level.  This allows for the groups with more beetles in total to have both more killed as well as more survivors.  An alternative way of modeling this would be to look at the percentage of survival as `killed`/`total`, but I'll leave it as the author has it set up originally.
+
+
+```{r}
+beetles <- beetles_raw %>% 
+  mutate(alive = number - killed)
+```
+
+```{r}
+y <- beetles %>% 
+  select(killed, alive) %>% 
+  as.matrix()
+
+x <- beetles %>% 
+  select(dose) %>% 
+  unlist()
+
+m0 <- glm(y ~ x,
+          family = binomial(link = "logit"))
+
+m0
+```
+
+
+We see below that while the coefficients are significant, the fit could be better.  There is still variance that is not being explained as we can see from the residual deviance of 11.232 as compared to 6 degrees of freedom.  Ideally, this would be less than the degrees of freedom.
+
+```{r}
+summary(m0)
+```
+
+When switch to a probit link function we see that the standard error decreases, which is good, but the residual deviance still high.
+
+```{r}
+m1 <- glm(y ~ x,
+          family = binomial(link = "probit"))
+summary(m1)
+```
+
+The complimentary log log function (AKA the extreme value tolerance distribution) is a better fit because the reisual deviance is lower than the mean degrees of freedom, the AIC is lower,and the p-values are still low.
+
+```{r}
+m2 <- glm(y ~ x,
+          family = binomial(link = "cloglog"))
+summary(m2)
+```
+
+We can compute the Deviance by taking the sum of the squared deviance residuals:
+
+```{r}
+sum(residuals(m2, type = "deviance")^2)
+```
+
+as well as the Pearson Chi-Square statistic:
+
+```{r}
+sum(residuals(m2, type = "pearson")^2)
+```
+
+The graph below shows how `cloglog` fit is closer on average to the true number of beetles killed.  This means that the residual is smaller.
+
+```{r}
+beetles %>%
+  mutate(`logit fitted` = number*(m0$fitted.values),
+         `complimentary log log fitted` = number*(m2$fitted.values)) %>% #multiplye percentage of killed times sample size to get number killed
+  gather(key = obs_type, #name of column which will have rows of the old column names
+         value = killed, #name of the value column which will have been stacked
+         - c(dose, number, alive)) %>% #columns which you DON'T want to stack
+  ggplot(aes(dose, killed, shape = obs_type, color = obs_type)) + 
+  geom_point() + 
+  ggtitle("Actual Verses Fitted on Grouped Binary Response")
+
+```
+
+We can compute the pseudo R^2 value by first computing the null model, that is, the model with only an intercept term.
+
+```{r}
+m_null = glm(y ~ 1, family = binomial(link="logit"))
+1 - logLik(m2)/logLik(m_null)
+```
+
+Let's look again at the diagnostic plots.  
+
+```{r}
+glmdiag <- glm.diag(m2)   #Creating diagnostic information
+glm.diag.plots(m2, glmdiag)
+```
+
+A final note from the author: The model could be computed on individual observations instead of grouped data.  For either case, the coefficients of the model will come out the same; however the diagnostic statistics for the model will be different.  These differences relate to the models varying ability to predict group rates of events as compared to its ability to predict individual outcomes.
+
+# Example 4: Nominal Logistic Regression
+
+We look at a data set of car preferences to determine the importance of power steering and air conditioning by sex.  The response is the level of importance of power steering as no/little importance, important, or very important.
+
+```{r}
+car_preferences <- read_csv("//FILE-NA1-02/USERDATA2$/sam82554/Desktop/MAS-I/R/TIA Data/car_preferences.csv") %>% 
+  modify_if(is.character, as.factor)
+```
+
+```{r}
+glimpse(car_preferences)
+summary(car_preferences)
+car_preferences %>% 
+  map(~unique(.x))
+```
+We set the reference levels
+
+```{r}
+car_preferences <- within(car_preferences, sex <- relevel(sex, ref = "women"))
+car_preferences <- within(car_preferences, response <- relevel(response, ref = "no/little"))
+car_preferences <- within(car_preferences, age <- relevel(age, ref = "18-23"))
+```
+
+The summary below is difficult to interpret
+
+```{r}
+m0 <- multinom(response ~ age + sex, weights = freq, data =  car_preferences)
+summary(m0)
+```
+
+So we can instead look at the odds ratios.  What this shows us is that the odds of importance is going up with age.  As the age increases from 18 - 20 to 24-40, the odds ratio increases by 3.09.  As this increases to > 40, the odds ratio increases to 4.9. The relative importance for power steering was less for men than women as the odds ratios for `very important/sexmen` and `important/sexmen` are less than 1.
+
+```{r}
+odds.ratio(m0)
+```
+We can compare the fitted probabilities with the expeted probabilities to compute a pearson statistic.
+
+```{r}
+m_null <- multinom(response ~ 1, weights = freq, data =  car_preferences)
+summary(m_null)
+```
+
+The likelihood ratio chi-square statistic is large, indicating that the fitted `m0` is not explaining a lot of the variance in the data.
+
+```{r}
+2*(logLik(m0) - logLik(m_null))
+```
+
+#Example 5: Cumulative Odds Model
+
+To simplify, we encode `Not Important`, `Important`, `Very Important`,  as 1, 2, or 3.  Instead of modeling the probability of being in each of the categories, the proportional odds model looks at the cumulative probabilities of case 1, case 1 OR case 2, or case 1 OR case 2 OR case 3.  
+
+We notice that the AIC is improved over the nominal model.  The deviance has increased slightly due to the the decrease in the number of parameters.
+
+```{r}
+car_preferences %>% 
+  mutate(response_case = case_when(
+    response %% "no/little " == 0 ~ 1,
+    response %% "important" == 0 ~ 2,
+    response %% "very important" == 0 ~ 3,
+    TRUE ~ as.double(response)
+  ))
+
+m_pro_odds <- polr(response ~ age + sex, 
+                   weights = freq, 
+                   data = car_preferences)
+
+summary(m_pro_odds)
+```
+
+# Example 6: Count Data
+
+Data is deaths as related collorary failure for smoking and non-smoking patients.  We are looking for a relationship between `smoking` and `deaths`.
+
+```{r}
+smoking_death <- read_csv("//FILE-NA1-02/USERDATA2$/sam82554/Desktop/MAS-I/R/TIA Data/smoking_death.csv") %>% 
+  modify_if(is.character, as.factor)
+
+glimpse(smoking_death)
+```
+
+We can look at the box plot and see tha average number of deaths for `smoking` is higher than that without.  There is little correlation with `age`.  We also see that non-smokers are younger on average than smokers.
+
+```{r}
+featurePlot(x = smoking_death %>% select( -smoking, - age, - age_num),
+            y = smoking_death$smoking,
+            plot = "box",
+            scales = list(y = list(relation="free"),
+                          x = list(rot = 90)),
+            layout = c(4,1 ), 
+            auto.key = list(columns = 2)
+)
+```
+
+
+```{r}
+smoking_death %>% 
+  mutate(percent_coronary_failure =deaths/`person-years`) %>% 
+  ggplot(aes(age, percent_coronary_failure)) + 
+  geom_boxplot() + 
+  ggtitle("Percent of coronary by age increases quantratically")
+```
+
+We can include a quadratic term in the model to take this into account.  We also will include an interaction with `age` and `smoking`.  We will use a Poisson family due to the fact that we are dealing with count data.  We also include an offset term of `person-years`, which forces the coefficient to be 1.  
+
+```{r}
+m0 <- glm(deaths ~ age_num + I(age_num^2) + smoking + age_num*smoking + offset(log(`person-years`)), 
+          family = "poisson", 
+          data = smoking_death)
+
+```
+
+The summary below shows a great fit.  The AIC is low, the residual deviance is less than the degrees of freedom, all of the variables are highly-significant.  
+
+```{r}
+summary(m0)
+```
+
+We can inspect the actual verses fitted values.
+
+```{r}
+p1 <- 
+smoking_death %>% 
+  mutate(fitted = fitted.values(m0)) %>% 
+  filter(smoking == "smoker") %>% 
+  rename(actual = deaths) %>% 
+  select(age, actual, fitted) %>% 
+  gather(obs_type, deaths, - age) %>% 
+  ggplot(aes(age, deaths, colour = obs_type, shape = obs_type)) + 
+  geom_point() + 
+  ggtitle("Actual Vs. Fitted for Smokers")
+
+p2 <- 
+  smoking_death %>% 
+  mutate(fitted = fitted.values(m0)) %>% 
+  filter(smoking == "non-smoker") %>% 
+  rename(actual = deaths) %>% 
+  select(age, actual, fitted) %>% 
+  gather(obs_type, deaths, - age) %>% 
+  ggplot(aes(age, deaths, colour = obs_type, shape = obs_type)) + 
+  geom_point() + 
+  ggtitle("Actual Vs. Fitted for Non-Smokers")
+
+grid.arrange(p1, p2, ncol = 2)
+```
+
+The exponentials of the coefficients shows the relativities.  The signs of the coefficients on `smoker` below indicates that the likelihood of dying due to collorary failure for smokers is higher than for non-smokers, but this impact decreases as `age` increases because the interaction of `smoker` and `age` is less than 1.  The other coefficients can be interpreted similarly.
+
+```{r}
+m0 %>% coef() %>% exp()
+```
+
+#Example 7: Continency Tables with Poisson Regression
+
+The data for has information relating aspirin usage to ulcers.  The `ulcer` field is the type of ulcer, the `casecontrol` field indicates if the patient was tested in the case group, those with known ulcers, and control group individuals who were similar to the case group but not known to have an ulcer, and `aspirin` indicating whether or not a patient uses aspirin regularly.  The `frequency` column indicates the number of patients in each of these groups.  Just like in the previous example, this means that we are dealing with "compressed" or summarized data instead of line-items.
+
+```{r}
+aspirin_ulcers <- read_csv("//FILE-NA1-02/USERDATA2$/sam82554/Desktop/MAS-I/R/TIA Data/aspirin_ulcers.csv") %>% 
+  modify_if(is.character, as.factor)
+
+head(aspirin_ulcers)
+```
+
+The goal is to be able to predict the number of patients in each of these categories based on the 3 binary variables.  This means that we have a total of 2^3 = 8 possible combinations.  Which of these should we include?  To start, we look only at the interaction with `ulcer` and `casecontrol`.
+
+We see that the model is poor given the high deviance and p-values.  
+
+```{r}
+m0 <- glm(frequency ~ ulcer + casecontrol + ulcer*casecontrol, 
+          family = "poisson", 
+          data = aspirin_ulcers)
+summary(m0)
+```
+
+Just adding `aspirin` improves the fit.
+
+```{r}
+m1 <- glm(frequency ~ aspirin + ulcer + casecontrol + ulcer*casecontrol, 
+          family = "poisson", 
+          data = aspirin_ulcers)
+summary(m1)
+```
+
+```{r}
+m2 <- glm(frequency ~ aspirin + ulcer + casecontrol + ulcer*casecontrol + aspirin*casecontrol, 
+          family = "poisson", 
+          data = aspirin_ulcers)
+summary(m2)
+```
+As we add additional interactions, the number of parameters increases, which means that the degrees of freedom, 8 - p, where p is the number of coefficients, decreases.  If we wanted to have perfect predictions on the training data, we would just include 8 parameters in order to have 1 prediction per row in the data.  
+
+```{r}
+m3 <- glm(frequency ~ aspirin + ulcer + casecontrol + ulcer*casecontrol + aspirin*casecontrol + aspirin*ulcer, 
+          family = "poisson", 
+          data = aspirin_ulcers)
+summary(m3)
+```
+
+When we add in the last interaction term, we create what is known as a saturated model.  This has deviance equal to zero (1.7764e-14 below), because deviance is the difference in log likelihood between the saturated model and the model being tested.
+
+```{r}
+m4 <- glm(frequency ~ aspirin + ulcer + casecontrol + ulcer*casecontrol + aspirin*casecontrol + aspirin*casecontrol*ulcer, 
+          family = "poisson", 
+          data = aspirin_ulcers)
+summary(m4)
+```
+
+The AIC continues to decrease as we add more terms.  But this does not mean that the model would improve at making predictions on the test set, but only on the training set.
+
+```{r fig.height= 4}
+grid.arrange(
+  data_frame(
+    number_of_parameters = c(4, 5, 6, 7, 8),
+    AIC = list(m0, m1, m2, m3, m4) %>% map_dbl(AIC)
+    ) %>% 
+    ggplot(aes(number_of_parameters, AIC, label = round(AIC, 1))) + 
+    geom_point() + 
+    geom_line() + 
+    geom_text(nudge_y = 2, nudge_x = 0.1)
+  ,
+  data_frame(
+    number_of_parameters = c(4, 5, 6, 7, 8),
+    Deviance = list(m0, m1, m2, m3, m4) %>% map_dbl(deviance)
+    ) %>% 
+    ggplot(aes(number_of_parameters, Deviance, label = round(Deviance, 1))) + 
+    geom_point() + 
+    geom_line() + 
+    geom_text(nudge_y = 2, nudge_x = 0.1),
+  ncol = 2
+  )
+```
+
+The third model seems to be the best trade-off in terms of decreasing the error while not adding too many parameters, `frequency ~ aspirin + ulcer + casecontrol + ulcer*casecontrol + aspirin*casecontrol`, where the above shows the decrease in AIC from 71.4 to 62.2.
+
+This is an example of when we need to rely on statistics for model selection as we do not see a great fit from just looking at the actual verses fitted values.  
+
+```{r}
+aspirin_ulcers %>% 
+  mutate(fitted = fitted.values(m2)) %>% 
+  rename(actual = frequency) %>% 
+  gather(obs_type, frequency, - ulcer, - casecontrol, - aspirin) %>% 
+  group_by(obs_type) %>% 
+  mutate(index = row_number()) %>% 
+  ungroup() %>% 
+  ggplot(aes(index, frequency, colour = obs_type, shape = obs_type)) + 
+  geom_point() + 
+  ggtitle("Actual Vs. Fitted still shows an imperfect match")
+```
+
+# Example 7: Overdispersion in Count Data
+
+For a Poisson distribution, one of the nice properties is that the mean is equal to the variance.  In Poisson regression, in order to fit a model, we need the empirical mean to be close to the empirical variance.  Overdispersion is when this is not the case, and special treatment is needed.
+
+The data set contains information for third party claims by geography for 176 different locations.  Each location has a number of claims, population, population density, and number of accidents.  We apply log transforms in order to aid modeling.
+
+```{r}
+third_party_claims <- read_csv("//FILE-NA1-02/USERDATA2$/sam82554/Desktop/MAS-I/R/TIA Data/third_party_claims.csv") %>% 
+  modify_if(is.character, as.factor) %>% 
+  mutate(
+    log_claims = log(claims),
+    log_accidents = log(accidents),
+    log_population = log(population)
+  )
+
+head(third_party_claims)
+
+```
+
+The graph below shows a linear relation ship between the log transforms of `accidents` and `claims`.
+
+```{r}
+third_party_claims %>% 
+  ggplot(aes(log_claims, log_accidents)) + 
+  geom_point()
+```
+
+We try a Poisson model, but the residual deviance is large.
+
+```{r}
+m0 <- glm(claims ~ log_accidents, 
+          family = "poisson",
+          offset = log_population,
+          data = third_party_claims) 
+
+summary(m0)
+```
+
+
+From Baysian theory, the negative binomial is related to the Poisson-Gamma mixture, which has a large variance than a poisson model itself.  When we switch this response distribution to the negative binomial, we see a better fit in that the AIC decreases significantly.  Notice that we know have a dispersion parameter.
+
+```{r}
+m1 <- glm.nb(claims ~ log_accidents + offset(log_population),
+             data = third_party_claims)
+summary(m1)
+```
+
+We look at the rate of claims against the log of the accidents and see that the negative binomial fit (in red) does a slightly better job of capturing the higher rates.
+
+```{r}
+plot(claims/population ~ log_accidents, data = third_party_claims, pch=16, cex=.8, las=1, cex.axis=1.1, cex.lab=1.1)
+curve(exp(-6.95443 +0.25389*x), add=TRUE, lwd=4, col = "red")
+curve(exp(-7.09381 + 0.25910*x), add=TRUE, lwd=3, col = "blue")
+```
+
+An alternative way of dealing with overdispersion is through quais-likelihood.  This results in the same coefficient estimates, but they have larger variances.  So you get the same estimates for the Poisson mean, but with larger predicted variances.
+
+
+```{r}
+m2 <- glm(claims ~ log_accidents, 
+          family = quasi(link="log",variance="mu"),
+          offset = log_population,
+          data = third_party_claims)
+summary(m2)
+```
+
+This gives us the same model as the Poisson model, only the variances are now larger.  The means of the response stays the same, but the variances increases according to the dispersion parameter of 101.71 as seen below.  Also note that the AIC cannot be computed as we do not have a real likelihood value.
+
+Where does R come up with the dispersion parameter?  From taking Pearson Chi-Square statistic and dividing by the degrees of freedom.  This is just an estimate of the variance.
+
+```{r}
+sum(residuals(m2, type = "pearson")^2)/174
+```
+
+
+
+
+Sources:
+
+1. Regression on count data: http://data.princeton.edu/wws509/notes/c4a.pdf
