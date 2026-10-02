@@ -1,0 +1,36 @@
+# SamWiki theme contract
+# Theme setup follows GitHub's Jekyll theme guide:
+# https://docs.github.com/en/pages/setting-up-a-github-pages-site-with-jekyll/adding-a-theme-to-your-github-pages-site-using-jekyll
+#
+# Strategy: pages-themes/cayman@v0.2.0, skinned in assets/css/style.scss.
+# Skin files copied from sdcastillo/sdcastillo.github.io main:
+#   assets/css/style.scss       @import "jekyll-theme-cayman" plus SamWiki overrides
+#   _layouts/default.html
+#   _includes/head-custom.html
+#   _includes/samwiki-nav.html
+# The home page sets `samwiki: true` in its front matter.
+#
+# This project site publishes from the default branch (`master`) at the
+# repository root. Leave url and baseurl unset so GitHub Pages supplies
+# https://sdcastillo.github.io/MAS-I/
+
+title: MAS-I
+description: Study notes and R code for the CAS Modern Actuarial Statistics I exam.
+remote_theme: pages-themes/cayman@v0.2.0
+plugins:
+  - jekyll-remote-theme
+  - jekyll-seo-tag
+show_downloads: false
+markdown: kramdown
+
+# The R Markdown source opens with YAML front matter. Leave it out of the
+# Jekyll build so the rendered HTML note remains the file that is served.
+# README.md stays the GitHub repository overview.
+exclude:
+  - .sass-cache/
+  - .jekyll-cache/
+  - Gemfile
+  - Gemfile.lock
+  - vendor/
+  - README.md
+  - "Linear Models Part I.Rmd"
