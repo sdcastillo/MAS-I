@@ -2,11 +2,19 @@
 
 ## Overview
 
-This is Sam's personal study repository containing comprehensive study notes and R code for the **Modern Actuarial Statistics I (MAS-I) exam**. While I took a career break, I have continued dedicating time to studying for this challenging actuarial examination.
+This is Sam's personal study repository containing study notes and R code for the **Modern Actuarial Statistics I (MAS-I) exam**. While I took a career break, I have continued dedicating time to studying for this challenging actuarial examination.
+
+MAS-I is a Casualty Actuarial Society exam. The CAS content outline splits it into three domains: probability models, including stochastic processes and survival models (about 20–30%); statistics at the level of a second undergraduate course (about 20–30%); and extended linear models (about 45–55%). The note in this repository works through that third domain in R.
+
+The repository holds one installment, Linear Models Part I: `Linear Models Part I.Rmd`, the rendered `Linear_Models_Part_I.html`, and five CSV tables used in the examples. The note starts with six response distributions (exponential, gamma, Weibull, Pareto, lognormal, and beta), each with a simulated density and distribution function. It then fits a Gaussian ANOVA and an ANCOVA on a continuous response, grouped logit, probit, and complementary log-log models on beetle mortality, a nominal logistic model and a cumulative-odds model on car preferences, a Poisson rate for smoking deaths, a Poisson contingency table for aspirin and ulcers, and a negative binomial plus quasi-likelihood comparison for overdispersed third-party claims.
+
+The rendered HTML is the page to read. The R chunks still load the tables from an old local path; the CSV copies in the repository root are the files to use if you knit the note yourself. The probability-model and statistics domains are the setting for the distributions and the tests in the examples. They are not separate chapters in this repository.
 
 ## 🎯 About This Project
 
 This repository serves as a learning resource for actuarial science students studying for the MAS-I exam. It contains detailed notes, R code examples, and datasets used in practice problems and analysis.
+
+The GitHub Pages home page uses the SamWiki skin on the Cayman theme. Navigation returns to the hub: [Home](https://sdcastillo.github.io/), [About](https://sdcastillo.github.io/about/), and [Code](https://sdcastillo.github.io/code/).
 
 ## 📈 Datasets
 
@@ -53,11 +61,15 @@ Epidemiological data on smoking and mortality
 
 ## 📝 Course Content
 
-This repository covers key topics from Modern Actuarial Statistics I including:
-- Linear regression and generalized linear models
-- Categorical data analysis
-- Survival analysis
-- Statistical modeling for actuarial applications
+The note is organized as one linear-models installment:
+
+- Six response distributions, with empirical densities and distribution functions
+- Continuous response: Gaussian ANOVA, then ANCOVA
+- Grouped binary data: logit, probit, and complementary log-log
+- Ordered preference: nominal logistic regression and a cumulative-odds model
+- Counts: Poisson rates and offsets, a contingency table, negative binomial and quasi-likelihood for overdispersion
+
+Those examples sit inside the MAS-I extended linear models domain. The probability-model domain (stochastic processes and survival models) and the statistics domain are the background for the distributions, the offsets, and the model comparisons.
 
 ## 👥 Join Us!
 
@@ -79,4 +91,4 @@ This repository welcomes contributions from fellow actuarial science students an
 
 ---
 
-**Last Updated**: December 2025
+**Last Updated**: October 2026
