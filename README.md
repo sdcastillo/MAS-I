@@ -14,7 +14,7 @@ The rendered HTML is the page to read. The R chunks still load the tables from a
 
 This repository serves as a learning resource for actuarial science students studying for the MAS-I exam. It contains detailed notes, R code examples, and datasets used in practice problems and analysis.
 
-The GitHub Pages home page uses the SamWiki skin on the Cayman theme. Navigation returns to the hub: [Home](https://sdcastillo.github.io/), [About](https://sdcastillo.github.io/about/), and [Code](https://sdcastillo.github.io/code/).
+The GitHub Pages home page uses the SamWiki skin on the Cayman theme. Navigation returns to the hub: [Home](https://sdcastillo.github.io/), [Running](https://sdcastillo.github.io/running/), [About](https://sdcastillo.github.io/about.html), and [Code](https://sdcastillo.github.io/code.html), plus [Linktree](https://linktr.ee/samuel.castillo).
 
 ## 📈 Datasets
 
