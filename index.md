@@ -117,3 +117,14 @@ The tables below are the ones named in the note. Column lists match the files in
 ## Using the files
 
 The rendered note is the page to read. The R Markdown source stays in the GitHub repository and is left out of the Jekyll build so its own front matter is not published as a second page. Contributions of further MAS-I notes, code fixes, or practice problems are welcome. The project license is the [MIT License]({{ '/LICENSE' | relative_url }}).
+
+<section class="sw-videos" aria-labelledby="sw-videos-title">
+  <h2 id="sw-videos-title">Videos</h2>
+  <p>Sam Castillo's video on GLM link functions, the core of the linear-models material in this note.</p>
+  <div style="position:relative;padding-top:56.25%;margin:1rem 0;">
+    <iframe src="https://www.youtube.com/embed/xDJXuoM6ZCI" title="Mastering GLM Link Functions: A Comprehensive Guide" style="position:absolute;inset:0;width:100%;height:100%;border:0;" allowfullscreen loading="lazy"></iframe>
+  </div>
+  <ul>
+    <li><a href="https://www.youtube.com/watch?v=xDJXuoM6ZCI">Mastering GLM Link Functions: A Comprehensive Guide</a> (YouTube)</li>
+  </ul>
+</section>
