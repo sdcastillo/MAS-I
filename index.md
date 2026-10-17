@@ -128,3 +128,7 @@ The rendered note is the page to read. The R Markdown source stays in the GitHub
     <li><a href="https://www.youtube.com/watch?v=xDJXuoM6ZCI">Mastering GLM Link Functions: A Comprehensive Guide</a> (YouTube)</li>
   </ul>
 </section>
+
+## Reading guide
+
+The exam notes above are one installment. A separate SamWiki page collects recent sources on autism, medical misdiagnosis, and what the spectrum means: [Autism, misdiagnosis, and the spectrum]({{ '/writing/autism-misdiagnosis-and-the-spectrum/' | relative_url }}). It is a reading guide to the 2026 England review and the clinical papers, and it is open to anyone.
